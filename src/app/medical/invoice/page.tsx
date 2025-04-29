@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import {
   FaSearch,
-  FaPrint,
   FaSave,
   FaSpinner,
   FaInfoCircle,
@@ -29,7 +28,7 @@ const commonMedicinePrices: Record<string, number> = {
 };
 
 interface Invoice {
-  id: string;
+  id?: string;
   patientId: string;
   patientName: string;
   examDate: string;
@@ -139,11 +138,27 @@ export default function InvoicePage() {
     try {
       console.log("Loading recent invoices...");
 
-      // Note: In a real app, firebaseService would have a getAllInvoices() function
-      // For simplicity in this demo, we're just setting an empty array
-      setInvoices([]);
+      // Lấy tất cả các hóa đơn từ Firestore
+      const allInvoices = await firebaseService.getAllInvoices();
 
-      console.log("Reset invoices array");
+      if (allInvoices && allInvoices.length > 0) {
+        // Đảm bảo mỗi hóa đơn có id
+        const validInvoices = allInvoices.filter((invoice) => invoice.id);
+
+        // Sắp xếp hóa đơn theo ngày, mới nhất lên đầu
+        const sortedInvoices = [...validInvoices].sort(
+          (a, b) =>
+            new Date(b.examDate).getTime() - new Date(a.examDate).getTime()
+        );
+
+        // Giới hạn hiển thị 5 hóa đơn gần đây nhất
+        const recentInvoices = sortedInvoices.slice(0, 5);
+        setInvoices(recentInvoices);
+        console.log("Loaded recent invoices:", recentInvoices.length);
+      } else {
+        setInvoices([]);
+        console.log("No invoices found");
+      }
     } catch (error) {
       console.error("Error loading invoices:", error);
       setInvoices([]);
@@ -153,6 +168,7 @@ export default function InvoicePage() {
   };
 
   // Get all invoices from Firebase
+  /*
   const getAllInvoices = async (): Promise<Invoice[]> => {
     try {
       console.log("Fetching all invoices from Firebase...");
@@ -200,6 +216,7 @@ export default function InvoicePage() {
       return [];
     }
   };
+  */
 
   // Handle search for patients
   const handleSearch = () => {
@@ -470,7 +487,7 @@ export default function InvoicePage() {
 
           // Create normalized medicine object with default values for missing properties
           const normalizedMedicine = {
-            id: medicine.id || `med_${index}_${Date.now()}`,
+            id: medicine.id || `med_${index}`,
             name: medicine.name || "Unknown Medicine",
             unit: medicine.unit || "Viên",
             quantity: Number(medicine.quantity) || 1,
@@ -602,30 +619,38 @@ export default function InvoicePage() {
     }
   };
 
-  // Print the invoice
-  const handlePrintInvoice = () => {
-    if (!invoiceForm.patientId || !invoiceForm.examDate) {
-      alert("Vui lòng điền đầy đủ thông tin hóa đơn");
-      return;
-    }
-
-    alert("Chức năng in hóa đơn sẽ được phát triển sau");
-  };
-
   // Mark invoice as paid
-  const handleMarkAsPaid = (id: string) => {
-    setInvoices(
-      invoices.map((invoice) =>
-        invoice.id === id
-          ? {
-              ...invoice,
-              isPaid: true,
-              paymentDate: new Date().toISOString().slice(0, 10),
-              paymentMethod: medicalConfig.paymentMethods[0], // Using first payment method from config
-            }
-          : invoice
-      )
-    );
+  const handleMarkAsPaid = async (id: string) => {
+    try {
+      // Cập nhật trạng thái thanh toán trong Firestore
+      const success = await firebaseService.updateInvoicePayment(
+        id,
+        true,
+        medicalConfig.paymentMethods[0] // Sử dụng phương thức thanh toán mặc định
+      );
+
+      if (success) {
+        // Cập nhật UI nếu thành công
+        setInvoices(
+          invoices.map((invoice) =>
+            invoice.id === id
+              ? {
+                  ...invoice,
+                  isPaid: true,
+                  paymentDate: new Date().toISOString().slice(0, 10),
+                  paymentMethod: medicalConfig.paymentMethods[0],
+                }
+              : invoice
+          )
+        );
+        alert("Đã cập nhật trạng thái thanh toán");
+      } else {
+        alert("Không thể cập nhật trạng thái thanh toán");
+      }
+    } catch (error) {
+      console.error("Error marking invoice as paid:", error);
+      alert("Lỗi khi cập nhật trạng thái thanh toán");
+    }
   };
 
   // Format currency
@@ -636,14 +661,17 @@ export default function InvoicePage() {
     }).format(amount);
   };
 
-  // Format date
+  // Format date - sử dụng cách định dạng nhất quán giữa server và client
   const formatDate = (dateString: string) => {
-    const options: Intl.DateTimeFormatOptions = {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    };
-    return new Date(dateString).toLocaleDateString("vi-VN", options);
+    try {
+      const date = new Date(dateString);
+      const day = String(date.getDate()).padStart(2, "0");
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch {
+      return dateString;
+    }
   };
 
   return (
@@ -957,15 +985,6 @@ export default function InvoicePage() {
                       </>
                     )}
                   </button>
-                  <button
-                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 flex items-center"
-                    onClick={handlePrintInvoice}
-                    disabled={
-                      !selectedPatient || !selectedExamination || isSaving
-                    }
-                  >
-                    <FaPrint className="mr-2" /> In hóa đơn
-                  </button>
                 </div>
               </div>
             </div>
@@ -1027,7 +1046,7 @@ export default function InvoicePage() {
                         <div className="mt-2 text-right">
                           <button
                             className="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600"
-                            onClick={() => handleMarkAsPaid(invoice.id)}
+                            onClick={() => handleMarkAsPaid(invoice.id || "")}
                           >
                             Đánh dấu đã thanh toán
                           </button>

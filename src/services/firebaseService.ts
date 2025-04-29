@@ -322,10 +322,10 @@ export const getExaminationsByPatient = async (
   patientId: string
 ): Promise<Examination[]> => {
   try {
+    // Chỉ sử dụng where, không sử dụng orderBy để tránh yêu cầu composite index
     const q = query(
       collection(db, COLLECTIONS.EXAMINATIONS),
-      where("patientId", "==", patientId),
-      orderBy("examDate", "desc")
+      where("patientId", "==", patientId)
     );
 
     const querySnapshot = await getDocs(q);
@@ -342,6 +342,12 @@ export const getExaminationsByPatient = async (
         diagnosis: data.diagnosis,
         medicines: data.medicines || [],
       });
+    });
+
+    // Sắp xếp kết quả ở phía client thay vì ở Firestore
+    examinations.sort((a, b) => {
+      // Sắp xếp theo ngày khám, giảm dần (mới nhất trước)
+      return new Date(b.examDate).getTime() - new Date(a.examDate).getTime();
     });
 
     return examinations;
@@ -483,6 +489,69 @@ export const updateInvoicePayment = async (
   }
 };
 
+/**
+ * Get all invoices
+ * @returns Array of invoices
+ */
+export const getAllInvoices = async (): Promise<Invoice[]> => {
+  try {
+    const querySnapshot = await getDocs(collection(db, COLLECTIONS.INVOICES));
+
+    const invoices: Invoice[] = [];
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      invoices.push({
+        id: doc.id,
+        patientId: data.patientId || "",
+        patientName: data.patientName || "",
+        examDate: data.examDate || "",
+        consultationFee: Number(data.consultationFee) || 0,
+        medicineFee: Number(data.medicineFee) || 0,
+        otherFees: Number(data.otherFees) || 0,
+        totalAmount: Number(data.totalAmount) || 0,
+        isPaid: Boolean(data.isPaid) || false,
+        paymentDate: data.paymentDate,
+        paymentMethod: data.paymentMethod,
+      });
+    });
+
+    return invoices;
+  } catch (error) {
+    console.error("Error getting all invoices:", error);
+    return [];
+  }
+};
+
+/**
+ * Get all patients
+ * @returns Array of patients
+ */
+export const getAllPatients = async (): Promise<Patient[]> => {
+  try {
+    const querySnapshot = await getDocs(collection(db, COLLECTIONS.PATIENTS));
+
+    const patients: Patient[] = [];
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      patients.push({
+        id: doc.id,
+        name: data.name,
+        gender: data.gender,
+        dateOfBirth: data.dateOfBirth,
+        address: data.address || "",
+        phoneNumber: data.phoneNumber || "",
+        registrationTime: data.registrationTime,
+        registrationDate: data.registrationDate,
+      });
+    });
+
+    return patients;
+  } catch (error) {
+    console.error("Error getting all patients:", error);
+    return [];
+  }
+};
+
 export default {
   // Patient functions
   addPatient,
@@ -501,4 +570,8 @@ export default {
   addInvoice,
   getInvoicesByPatient,
   updateInvoicePayment,
+  getAllInvoices,
+
+  // New function
+  getAllPatients,
 };

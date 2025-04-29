@@ -106,6 +106,15 @@ export default function ExaminationFormPage() {
         setPatientsWithExams(patientIdsWithExams);
 
         console.log("Patients with existing exams:", patientIdsWithExams.size);
+
+        // Sắp xếp kết quả ở phía client thay vì ở Firestore
+        const sortedExaminations = allExaminations.sort((a, b) => {
+          // Sắp xếp theo ngày khám, giảm dần (mới nhất trước)
+          return (
+            new Date(b.examDate).getTime() - new Date(a.examDate).getTime()
+          );
+        });
+        setSavedExaminations(sortedExaminations);
       } catch (error) {
         console.error("Error loading data:", error);
       } finally {
