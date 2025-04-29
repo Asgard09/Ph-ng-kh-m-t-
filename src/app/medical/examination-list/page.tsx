@@ -7,6 +7,8 @@ import {
   FaTrash,
   FaSpinner,
   FaStethoscope,
+  FaSave,
+  FaTimes,
 } from "react-icons/fa";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { validationConfig } from "@/config";
@@ -24,6 +26,8 @@ export default function ExaminationListPage() {
   const [loading, setLoading] = useState<boolean>(false);
   const [savingPatient, setSavingPatient] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [showEditModal, setShowEditModal] = useState<boolean>(false);
+  const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
 
   // State for form data
   const [patientForm, setPatientForm] = useState<
@@ -72,19 +76,26 @@ export default function ExaminationListPage() {
     setCurrentDate(e.target.value);
   };
 
-  // Handle adding a patient
-  const handleAddPatient = async () => {
+  // Validate patient data
+  const validatePatientData = (data: typeof patientForm) => {
     const errors = [];
 
-    if (!patientForm.name.trim()) errors.push("Họ và tên không được để trống");
-    if (!patientForm.gender) errors.push("Giới tính không được để trống");
-    if (!patientForm.dateOfBirth) errors.push("Ngày sinh không được để trống");
+    if (!data.name.trim()) errors.push("Họ và tên không được để trống");
+    if (!data.gender) errors.push("Giới tính không được để trống");
+    if (!data.dateOfBirth) errors.push("Ngày sinh không được để trống");
 
-    if (!patientForm.phoneNumber) {
+    if (!data.phoneNumber) {
       errors.push("Số điện thoại không được để trống");
-    } else if (!validationConfig.phoneRegex.test(patientForm.phoneNumber)) {
+    } else if (!validationConfig.phoneRegex.test(data.phoneNumber)) {
       errors.push("Số điện thoại phải có 10 số và bắt đầu bằng số 0");
     }
+
+    return errors;
+  };
+
+  // Handle adding a patient
+  const handleAddPatient = async () => {
+    const errors = validatePatientData(patientForm);
 
     if (errors.length > 0) {
       alert(errors.join("\n"));
@@ -139,14 +150,53 @@ export default function ExaminationListPage() {
         return;
       }
 
-      // Here you would typically open a modal with the current data
-      // For now, we'll just show an alert
-      alert(
-        `Chức năng sửa thông tin bệnh nhân ${currentPatient.name} sẽ được phát triển sau`
-      );
+      // Set editing patient and show modal
+      setEditingPatient(currentPatient);
+      setShowEditModal(true);
     } catch (err) {
       console.error("Error preparing to edit patient:", err);
       alert("Lỗi khi chuẩn bị chỉnh sửa thông tin bệnh nhân");
+    }
+  };
+
+  // Handle saving edited patient
+  const handleSaveEdit = async () => {
+    if (!editingPatient) return;
+
+    const errors = validatePatientData(editingPatient);
+    if (errors.length > 0) {
+      alert(errors.join("\n"));
+      return;
+    }
+
+    try {
+      setSavingPatient(true);
+      const success = await firebaseService.updatePatient(editingPatient.id!, {
+        name: editingPatient.name,
+        gender: editingPatient.gender,
+        dateOfBirth: editingPatient.dateOfBirth,
+        address: editingPatient.address,
+        phoneNumber: editingPatient.phoneNumber,
+      });
+
+      if (success) {
+        // Update local state
+        setPatientList(
+          patientList.map((p) =>
+            p.id === editingPatient.id ? editingPatient : p
+          )
+        );
+        setShowEditModal(false);
+        setEditingPatient(null);
+        alert("Đã cập nhật thông tin bệnh nhân thành công");
+      } else {
+        alert("Không thể cập nhật thông tin bệnh nhân. Vui lòng thử lại.");
+      }
+    } catch (err) {
+      console.error("Error updating patient:", err);
+      alert("Lỗi khi cập nhật thông tin bệnh nhân");
+    } finally {
+      setSavingPatient(false);
     }
   };
 
@@ -422,6 +472,149 @@ export default function ExaminationListPage() {
             </div>
           )}
         </div>
+
+        {/* Edit Modal */}
+        {showEditModal && editingPatient && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold">
+                  Chỉnh sửa thông tin bệnh nhân
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingPatient(null);
+                  }}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <FaTimes />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Họ Tên <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border rounded"
+                    value={editingPatient.name}
+                    onChange={(e) =>
+                      setEditingPatient({
+                        ...editingPatient,
+                        name: e.target.value,
+                      })
+                    }
+                    disabled={savingPatient}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Giới Tính <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    className="w-full px-3 py-2 border rounded"
+                    value={editingPatient.gender}
+                    onChange={(e) =>
+                      setEditingPatient({
+                        ...editingPatient,
+                        gender: e.target.value,
+                      })
+                    }
+                    disabled={savingPatient}
+                  >
+                    <option value="">Chọn</option>
+                    <option value="Nam">Nam</option>
+                    <option value="Nữ">Nữ</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Ngày Sinh <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full px-3 py-2 border rounded"
+                    value={editingPatient.dateOfBirth}
+                    onChange={(e) =>
+                      setEditingPatient({
+                        ...editingPatient,
+                        dateOfBirth: e.target.value,
+                      })
+                    }
+                    disabled={savingPatient}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Số Điện Thoại <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    className="w-full px-3 py-2 border rounded"
+                    value={editingPatient.phoneNumber}
+                    onChange={(e) =>
+                      setEditingPatient({
+                        ...editingPatient,
+                        phoneNumber: e.target.value,
+                      })
+                    }
+                    placeholder="0xxxxxxxxx"
+                    disabled={savingPatient}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Địa Chỉ
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border rounded"
+                    value={editingPatient.address}
+                    onChange={(e) =>
+                      setEditingPatient({
+                        ...editingPatient,
+                        address: e.target.value,
+                      })
+                    }
+                    disabled={savingPatient}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingPatient(null);
+                  }}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                  disabled={savingPatient}
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleSaveEdit}
+                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-blue-300"
+                  disabled={savingPatient}
+                >
+                  {savingPatient ? (
+                    <>
+                      <FaSpinner className="inline mr-1 animate-spin" /> Đang
+                      lưu...
+                    </>
+                  ) : (
+                    <>
+                      <FaSave className="inline mr-1" /> Lưu thay đổi
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );
