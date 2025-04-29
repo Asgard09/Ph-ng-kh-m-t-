@@ -22,7 +22,7 @@ interface ExaminationForm {
   patientId: string;
   patientName: string;
   patientGender: string;
-  patientAge: number;
+  patientDateOfBirth: string;
   patientPhone: string;
   examDate: string;
   symptoms: string;
@@ -37,7 +37,7 @@ export default function ExaminationFormPage() {
     patientId: "",
     patientName: "",
     patientGender: "",
-    patientAge: 0,
+    patientDateOfBirth: "",
     patientPhone: "",
     examDate: new Date().toISOString().slice(0, 10),
     symptoms: "",
@@ -160,18 +160,13 @@ export default function ExaminationFormPage() {
           const selectedPatient = JSON.parse(selectedPatientJSON);
           console.log("Found selected patient:", selectedPatient);
 
-          // Calculate age from date of birth
-          const birthYear = new Date(selectedPatient.dateOfBirth).getFullYear();
-          const currentYear = new Date().getFullYear();
-          const age = currentYear - birthYear;
-
           // Update form data with patient info
           setFormData((prev) => ({
             ...prev,
             patientId: selectedPatient.id || "",
             patientName: selectedPatient.name || "",
             patientGender: selectedPatient.gender || "",
-            patientAge: age || 0,
+            patientDateOfBirth: selectedPatient.dateOfBirth || "",
             patientPhone: selectedPatient.phoneNumber || "",
           }));
 
@@ -196,7 +191,7 @@ export default function ExaminationFormPage() {
         patientId: "",
         patientName: "",
         patientGender: "",
-        patientAge: 0,
+        patientDateOfBirth: "",
         patientPhone: "",
       });
       return;
@@ -206,18 +201,13 @@ export default function ExaminationFormPage() {
     const selectedPatient = patientList.find((p) => p.id === selectedPatientId);
 
     if (selectedPatient) {
-      // Calculate age from date of birth
-      const birthYear = new Date(selectedPatient.dateOfBirth).getFullYear();
-      const currentYear = new Date().getFullYear();
-      const age = currentYear - birthYear;
-
       // Update form with patient data
       setFormData({
         ...formData,
         patientId: selectedPatient.id || "",
         patientName: selectedPatient.name,
         patientGender: selectedPatient.gender,
-        patientAge: age,
+        patientDateOfBirth: selectedPatient.dateOfBirth,
         patientPhone: selectedPatient.phoneNumber || "",
       });
     }
@@ -322,7 +312,8 @@ export default function ExaminationFormPage() {
 
     if (!formData.patientName) errors.push("Tên bệnh nhân không được để trống");
     if (!formData.patientGender) errors.push("Giới tính không được để trống");
-    if (!formData.patientAge) errors.push("Tuổi không được để trống");
+    if (!formData.patientDateOfBirth)
+      errors.push("Ngày sinh không được để trống");
     if (!formData.symptoms) errors.push("Triệu chứng không được để trống");
     if (!formData.diagnosis) errors.push("Chẩn đoán không được để trống");
 
@@ -339,28 +330,23 @@ export default function ExaminationFormPage() {
     if (!validateForm()) return;
 
     try {
-      // First, save patient information to the Patients collection
-      let patientId = "";
-      if (formData.patientName && formData.patientGender) {
-        // Calculate date of birth from age
-        const today = new Date();
-        const birthYear = today.getFullYear() - formData.patientAge;
-        const dateOfBirth = `${birthYear}-01-01`; // Default to Jan 1 since we only have the age
+      // Use existing patient ID if one was selected from dropdown, otherwise create new patient
+      let patientId = formData.patientId;
 
+      // If no existing patient was selected, create a new one
+      if (!patientId && formData.patientName && formData.patientGender) {
         // Prepare patient data for Firebase
         const patientData = {
           name: formData.patientName,
           gender: formData.patientGender,
-          dateOfBirth,
+          dateOfBirth: formData.patientDateOfBirth,
           phoneNumber: formData.patientPhone || "",
           address: "", // We don't have address in the examination form
           registrationDate: formData.examDate, // Explicitly set to match the examination date
           registrationTime: new Date().toLocaleTimeString("vi-VN"), // Current time
         };
 
-        console.log("Saving patient to database:", patientData);
-
-        // Save patient to database
+        console.log("Creating new patient:", patientData);
         patientId = await firebaseService.addPatient(patientData);
       }
 
@@ -373,6 +359,7 @@ export default function ExaminationFormPage() {
           symptoms: formData.symptoms,
           diagnosis: formData.diagnosis,
           medicines: formData.medicines,
+          notes: formData.notes,
         };
 
         console.log("Saving examination to database:", examinationData);
@@ -392,7 +379,7 @@ export default function ExaminationFormPage() {
         patientId: "",
         patientName: "",
         patientGender: "",
-        patientAge: 0,
+        patientDateOfBirth: "",
         patientPhone: "",
         examDate: new Date().toISOString().slice(0, 10),
         symptoms: "",
@@ -794,13 +781,13 @@ export default function ExaminationFormPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Tuổi <span className="text-red-500">*</span>
+                    Ngày Sinh <span className="text-red-500">*</span>
                   </label>
                   <input
-                    type="number"
-                    name="patientAge"
+                    type="date"
+                    name="patientDateOfBirth"
                     className="w-full px-3 py-2 border rounded"
-                    value={formData.patientAge || ""}
+                    value={formData.patientDateOfBirth}
                     onChange={handleInputChange}
                   />
                 </div>
