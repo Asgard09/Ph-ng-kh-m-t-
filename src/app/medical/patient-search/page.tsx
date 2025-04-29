@@ -1,124 +1,23 @@
 "use client";
 
-import { useState } from "react";
-import { FaSearch, FaFileMedical, FaFileInvoiceDollar } from "react-icons/fa";
+import { useState, useEffect } from "react";
+import {
+  FaSearch,
+  FaFileMedical,
+  FaFileInvoiceDollar,
+  FaPrint,
+  FaEye,
+  FaSpinner,
+} from "react-icons/fa";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Link from "next/link";
 import { formatDate, calculateAge } from "@/utils/helpers";
-
-interface Patient {
-  id: string;
-  name: string;
-  gender: string;
-  dateOfBirth: string;
-  phone: string;
-  address: string;
-}
-
-interface Examination {
-  id: string;
-  patientId: string;
-  patientName: string;
-  examDate: string;
-  symptoms: string;
-  diagnosis: string;
-  medicines: Array<{
-    id: string;
-    name: string;
-    unit: string;
-    quantity: number;
-    usage: string;
-  }>;
-}
+import { useRouter } from "next/navigation";
+import * as firebaseService from "@/services/firebaseService";
+import type { Patient, Examination } from "@/services/firebaseService";
 
 export default function PatientSearchPage() {
-  // Mock data - in a real app, these would come from a database
-  const [patients] = useState<Patient[]>([
-    {
-      id: "1",
-      name: "Nguyễn Văn A",
-      gender: "Nam",
-      dateOfBirth: "1985-05-15",
-      phone: "0901234567",
-      address: "123 Đường ABC, Quận XYZ, TP.HCM",
-    },
-    {
-      id: "2",
-      name: "Trần Thị B",
-      gender: "Nữ",
-      dateOfBirth: "1990-10-20",
-      phone: "0912345678",
-      address: "456 Đường DEF, Quận UVW, TP.HCM",
-    },
-  ]);
-
-  const [examinations] = useState<Examination[]>([
-    {
-      id: "1",
-      patientId: "1",
-      patientName: "Nguyễn Văn A",
-      examDate: "2023-11-10",
-      symptoms: "Sốt cao, đau họng",
-      diagnosis: "Viêm họng cấp",
-      medicines: [
-        {
-          id: "1",
-          name: "Paracetamol",
-          unit: "Viên",
-          quantity: 20,
-          usage: "Uống 1 viên khi sốt trên 38.5 độ, ngày không quá 3 viên",
-        },
-        {
-          id: "2",
-          name: "Amoxicillin",
-          unit: "Viên",
-          quantity: 20,
-          usage: "Uống 1 viên sau ăn, ngày 2 lần sáng-tối",
-        },
-      ],
-    },
-    {
-      id: "2",
-      patientId: "1",
-      patientName: "Nguyễn Văn A",
-      examDate: "2023-12-15",
-      symptoms: "Ho khan, sổ mũi",
-      diagnosis: "Viêm mũi dị ứng",
-      medicines: [
-        {
-          id: "3",
-          name: "Cetirizine",
-          unit: "Viên",
-          quantity: 10,
-          usage: "Uống 1 viên sau ăn tối",
-        },
-      ],
-    },
-    {
-      id: "3",
-      patientId: "2",
-      patientName: "Trần Thị B",
-      examDate: "2024-01-05",
-      symptoms: "Đau bụng, buồn nôn",
-      diagnosis: "Viêm dạ dày",
-      medicines: [
-        {
-          id: "4",
-          name: "Omeprazole",
-          unit: "Viên",
-          quantity: 14,
-          usage: "Uống 1 viên trước ăn sáng",
-        },
-        {
-          id: "5",
-          name: "Mebeverine",
-          unit: "Viên",
-          quantity: 30,
-          usage: "Uống 1 viên trước ăn, ngày 3 lần",
-        },
-      ],
-    },
-  ]);
+  const router = useRouter();
 
   // Search state
   const [searchTerm, setSearchTerm] = useState("");
@@ -130,41 +29,101 @@ export default function PatientSearchPage() {
   const [activeExamination, setActiveExamination] =
     useState<Examination | null>(null);
 
+  // Loading states
+  const [isSearching, setIsSearching] = useState(false);
+  const [isLoadingExaminations, setIsLoadingExaminations] = useState(false);
+  const [isLoadingAllExaminations, setIsLoadingAllExaminations] =
+    useState(false);
+
+  // All examinations for display
+  const [allExaminations, setAllExaminations] = useState<Examination[]>([]);
+
+  // Load all examinations when page loads
+  useEffect(() => {
+    const loadAllExaminations = async () => {
+      setIsLoadingAllExaminations(true);
+      try {
+        const examinations = await firebaseService.getAllExaminations();
+        setAllExaminations(examinations);
+        console.log("Loaded all examinations:", examinations.length);
+      } catch (error) {
+        console.error("Error loading examinations:", error);
+      } finally {
+        setIsLoadingAllExaminations(false);
+      }
+    };
+
+    loadAllExaminations();
+  }, []);
+
   // Handle search
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!searchTerm.trim()) {
       setSearchResults([]);
       return;
     }
 
-    const results = patients.filter(
-      (patient) =>
-        patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        patient.phone.includes(searchTerm)
-    );
-
-    setSearchResults(results);
-    setSelectedPatient(null);
-    setPatientExaminations([]);
-    setActiveExamination(null);
+    setIsSearching(true);
+    try {
+      const results = await firebaseService.searchPatients(searchTerm);
+      setSearchResults(results);
+      setSelectedPatient(null);
+      setPatientExaminations([]);
+      setActiveExamination(null);
+    } catch (error) {
+      console.error("Error searching patients:", error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   // Handle patient selection
-  const handleSelectPatient = (patient: Patient) => {
+  const handleSelectPatient = async (patient: Patient) => {
     setSelectedPatient(patient);
+    setIsLoadingExaminations(true);
 
-    // Find examinations for this patient
-    const examHistory = examinations.filter(
-      (exam) => exam.patientId === patient.id
-    );
-
-    setPatientExaminations(examHistory);
-    setActiveExamination(examHistory.length > 0 ? examHistory[0] : null);
+    try {
+      // Get examinations for this patient
+      const examHistory = await firebaseService.getExaminationsByPatient(
+        patient.id || ""
+      );
+      setPatientExaminations(examHistory);
+      setActiveExamination(examHistory.length > 0 ? examHistory[0] : null);
+    } catch (error) {
+      console.error("Error loading patient examinations:", error);
+      setPatientExaminations([]);
+      setActiveExamination(null);
+    } finally {
+      setIsLoadingExaminations(false);
+    }
   };
 
   // Handle examination selection
   const handleSelectExamination = (examination: Examination) => {
     setActiveExamination(examination);
+  };
+
+  // Handle view examination in examination form page
+  const handleViewExaminationDetails = (examination: Examination) => {
+    if (typeof window !== "undefined") {
+      // Store the selected examination in sessionStorage
+      sessionStorage.setItem(
+        "selectedExamination",
+        JSON.stringify(examination)
+      );
+
+      // If you also need the patient details
+      if (selectedPatient) {
+        sessionStorage.setItem(
+          "selectedPatient",
+          JSON.stringify(selectedPatient)
+        );
+      }
+
+      // Navigate to the examination form page
+      router.push("/medical/examination-form");
+    }
   };
 
   return (
@@ -191,10 +150,16 @@ export default function PatientSearchPage() {
                   }}
                 />
                 <button
-                  className="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600"
+                  className="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600 flex items-center"
                   onClick={handleSearch}
+                  disabled={isSearching}
                 >
-                  <FaSearch className="inline mr-1" /> Tìm kiếm
+                  {isSearching ? (
+                    <FaSpinner className="inline mr-1 animate-spin" />
+                  ) : (
+                    <FaSearch className="inline mr-1" />
+                  )}{" "}
+                  Tìm kiếm
                 </button>
               </div>
             </div>
@@ -202,7 +167,14 @@ export default function PatientSearchPage() {
         </div>
 
         {/* Search results */}
-        {searchResults.length > 0 && !selectedPatient && (
+        {isSearching && (
+          <div className="bg-white p-6 rounded-lg shadow mb-6 text-center">
+            <FaSpinner className="inline-block animate-spin text-blue-500 text-2xl" />
+            <p className="mt-2 text-gray-600">Đang tìm kiếm bệnh nhân...</p>
+          </div>
+        )}
+
+        {!isSearching && searchResults.length > 0 && !selectedPatient && (
           <div className="bg-white p-4 rounded-lg shadow mb-6">
             <h2 className="text-lg font-semibold mb-4">Kết quả tìm kiếm</h2>
             <div className="overflow-x-auto">
@@ -245,7 +217,7 @@ export default function PatientSearchPage() {
                         {new Date(patient.dateOfBirth).getFullYear()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {patient.phone}
+                        {patient.phoneNumber}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <button
@@ -291,7 +263,7 @@ export default function PatientSearchPage() {
                   </p>
                   <p>
                     <span className="font-medium">Số điện thoại:</span>{" "}
-                    {selectedPatient.phone}
+                    {selectedPatient.phoneNumber}
                   </p>
                   <p>
                     <span className="font-medium">Địa chỉ:</span>{" "}
@@ -303,6 +275,14 @@ export default function PatientSearchPage() {
                   <Link
                     href="/medical/examination-form"
                     className="block text-center bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+                    onClick={() => {
+                      if (typeof window !== "undefined") {
+                        sessionStorage.setItem(
+                          "selectedPatient",
+                          JSON.stringify(selectedPatient)
+                        );
+                      }
+                    }}
                   >
                     <FaFileMedical className="inline mr-1" /> Lập phiếu khám mới
                   </Link>
@@ -320,7 +300,11 @@ export default function PatientSearchPage() {
                 <h2 className="text-lg font-semibold mb-4">
                   Lịch sử khám bệnh
                 </h2>
-                {patientExaminations.length > 0 ? (
+                {isLoadingExaminations ? (
+                  <div className="flex justify-center py-6">
+                    <FaSpinner className="animate-spin text-blue-500 text-xl" />
+                  </div>
+                ) : patientExaminations.length > 0 ? (
                   <div className="space-y-2">
                     {patientExaminations.map((exam) => (
                       <div
@@ -417,8 +401,16 @@ export default function PatientSearchPage() {
                     </div>
                   </div>
 
-                  <div className="text-right">
-                    <button className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                  <div className="text-right flex justify-end space-x-2">
+                    <button
+                      className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                      onClick={() =>
+                        handleViewExaminationDetails(activeExamination)
+                      }
+                    >
+                      <FaEye className="inline mr-1" /> Xem chi tiết phiếu khám
+                    </button>
+                    <button className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
                       <FaPrint className="inline mr-1" /> In phiếu khám
                     </button>
                   </div>
@@ -426,7 +418,9 @@ export default function PatientSearchPage() {
               ) : (
                 <div className="bg-white p-4 rounded-lg shadow flex items-center justify-center h-64">
                   <p className="text-gray-500">
-                    {patientExaminations.length > 0
+                    {isLoadingExaminations
+                      ? "Đang tải dữ liệu khám bệnh..."
+                      : patientExaminations.length > 0
                       ? "Chọn một lần khám để xem chi tiết"
                       : "Không có dữ liệu khám bệnh"}
                   </p>
@@ -436,11 +430,88 @@ export default function PatientSearchPage() {
           </div>
         )}
 
+        {/* Recent Examinations */}
+        {!selectedPatient && !searchResults.length && !isSearching && (
+          <div className="bg-white p-4 rounded-lg shadow">
+            <h2 className="text-lg font-semibold mb-4">Phiếu khám gần đây</h2>
+
+            {isLoadingAllExaminations ? (
+              <div className="flex justify-center py-6">
+                <FaSpinner className="animate-spin text-blue-500 text-xl" />
+                <p className="ml-2 text-gray-600">
+                  Đang tải dữ liệu khám bệnh...
+                </p>
+              </div>
+            ) : allExaminations.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        STT
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Ngày khám
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Họ tên
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Chẩn đoán
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Số loại thuốc
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Thao tác
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {allExaminations.map((exam, index) => (
+                      <tr key={exam.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {index + 1}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {formatDate(exam.examDate)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {exam.patientName}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {exam.diagnosis}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {exam.medicines.length}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <button
+                            className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                            onClick={() => handleViewExaminationDetails(exam)}
+                          >
+                            <FaEye className="inline mr-1" /> Xem chi tiết
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-6 text-gray-500">
+                Chưa có phiếu khám nào được lưu
+              </div>
+            )}
+          </div>
+        )}
+
         {/* No results message */}
-        {searchTerm && searchResults.length === 0 && (
+        {!isSearching && searchTerm && searchResults.length === 0 && (
           <div className="bg-white p-4 rounded-lg shadow">
             <p className="text-center text-gray-500">
-              Không tìm thấy bệnh nhân phù hợp với từ khóa "{searchTerm}"
+              Không tìm thấy bệnh nhân phù hợp với từ khóa &ldquo;{searchTerm}
+              &rdquo;
             </p>
           </div>
         )}

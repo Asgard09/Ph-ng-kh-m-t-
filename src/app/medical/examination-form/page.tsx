@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FaPlus, FaTrash, FaSave, FaPrint } from "react-icons/fa";
+import { FaPlus, FaTrash, FaSave, FaPrint, FaArrowLeft } from "react-icons/fa";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { medicalConfig } from "@/config/medicalConfig";
 import * as firebaseService from "@/services/firebaseService";
 import type { Patient, Examination } from "@/services/firebaseService";
+import { useRouter } from "next/navigation";
 
 // Define interfaces for data types
 interface Medicine {
@@ -62,6 +63,9 @@ export default function ExaminationFormPage() {
   const [loadingPatientDetail, setLoadingPatientDetail] =
     useState<boolean>(false);
 
+  // State to track if we're viewing an examination from search page
+  const [viewingFromSearch, setViewingFromSearch] = useState<boolean>(false);
+
   // State for patients who already have examinations (to filter them out from dropdown)
   const [patientsWithExams, setPatientsWithExams] = useState<Set<string>>(
     new Set()
@@ -77,6 +81,8 @@ export default function ExaminationFormPage() {
 
   // State for saved forms
   const [savedForms, setSavedForms] = useState<ExaminationForm[]>([]);
+
+  const router = useRouter();
 
   // Load all patients for the dropdown
   useEffect(() => {
@@ -111,9 +117,42 @@ export default function ExaminationFormPage() {
     fetchAllPatients();
   }, []);
 
-  // Load patient data from sessionStorage if available
+  // Load patient data and examination data from sessionStorage if available
   useEffect(() => {
     if (typeof window !== "undefined") {
+      // Check for selected examination from patient search
+      const selectedExamInSession = sessionStorage.getItem(
+        "selectedExamination"
+      );
+
+      if (selectedExamInSession) {
+        try {
+          const examinationData = JSON.parse(selectedExamInSession);
+          console.log("Found selected examination:", examinationData);
+
+          // Set the examination to view
+          setSelectedExamination(examinationData);
+          setViewingFromSearch(true);
+
+          // Load the patient details if available
+          const selectedPatientJSON = sessionStorage.getItem("selectedPatient");
+          if (selectedPatientJSON) {
+            const patientData = JSON.parse(selectedPatientJSON);
+            setPatientDetail(patientData);
+          }
+
+          // Clear selectedExamination to avoid showing it on page refresh
+          sessionStorage.removeItem("selectedExamination");
+
+          // Show the examination view
+          setShowExaminations(true);
+
+          return; // Skip other loading if we're viewing a specific examination
+        } catch (error) {
+          console.error("Error parsing selected examination data:", error);
+        }
+      }
+
       const selectedPatientJSON = sessionStorage.getItem("selectedPatient");
 
       if (selectedPatientJSON) {
@@ -417,30 +456,46 @@ export default function ExaminationFormPage() {
     return currentYear - birthYear;
   };
 
+  // Go back to search page
+  const handleGoBackToSearch = () => {
+    router.push("/medical/patient-search");
+  };
+
   return (
     <DashboardLayout title="Lập phiếu khám bệnh">
       <div className="p-6">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">Lập Phiếu Khám Bệnh</h1>
           <div className="flex space-x-2">
-            <button
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 flex items-center"
-              onClick={handleSaveForm}
-              disabled={showExaminations || selectedExamination !== null}
-            >
-              <FaSave className="mr-2" /> Lưu phiếu khám
-            </button>
-            <button
-              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 flex items-center"
-              onClick={
-                showExaminations
-                  ? () => setShowExaminations(false)
-                  : handleViewExaminations
-              }
-            >
-              <FaPrint className="mr-2" />{" "}
-              {showExaminations ? "Quay lại form" : "Xem phiếu khám"}
-            </button>
+            {!selectedExamination && !showExaminations && (
+              <button
+                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 flex items-center"
+                onClick={handleSaveForm}
+              >
+                <FaSave className="mr-2" /> Lưu phiếu khám
+              </button>
+            )}
+            {viewingFromSearch && selectedExamination && (
+              <button
+                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 flex items-center"
+                onClick={handleGoBackToSearch}
+              >
+                <FaArrowLeft className="mr-2" /> Quay lại tìm kiếm
+              </button>
+            )}
+            {!viewingFromSearch && (
+              <button
+                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 flex items-center"
+                onClick={
+                  showExaminations
+                    ? () => setShowExaminations(false)
+                    : handleViewExaminations
+                }
+              >
+                <FaPrint className="mr-2" />{" "}
+                {showExaminations ? "Quay lại form" : "Xem phiếu khám"}
+              </button>
+            )}
           </div>
         </div>
 
