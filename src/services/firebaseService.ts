@@ -51,11 +51,16 @@ export interface Examination {
 
 // Medicine interface
 export interface Medicine {
-  id: string;
+  id?: string;
   name: string;
   unit: string;
   quantity: number;
-  usage: string;
+  usage?: string;
+  expiryDate?: string;
+  pharmacy?: string;
+  price?: number;
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 // Invoice interface
@@ -552,6 +557,139 @@ export const getAllPatients = async (): Promise<Patient[]> => {
   }
 };
 
+/**
+ * MEDICINE MANAGEMENT FUNCTIONS
+ */
+
+/**
+ * Add a new medicine
+ * @param medicineData - Medicine data
+ * @returns Medicine ID
+ */
+export const addMedicine = async (
+  medicineData: Omit<Medicine, "id">
+): Promise<string> => {
+  try {
+    const medicineWithTimestamp = {
+      ...medicineData,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    const docRef = await addDoc(
+      collection(db, COLLECTIONS.MEDICINES),
+      medicineWithTimestamp
+    );
+    return docRef.id;
+  } catch (error) {
+    console.error("Error adding medicine:", error);
+    throw new Error("Failed to add medicine");
+  }
+};
+
+/**
+ * Get all medicines
+ * @returns Array of medicines
+ */
+export const getAllMedicines = async (): Promise<Medicine[]> => {
+  try {
+    const querySnapshot = await getDocs(collection(db, COLLECTIONS.MEDICINES));
+
+    const medicines: Medicine[] = [];
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      medicines.push({
+        id: doc.id,
+        name: data.name,
+        unit: data.unit,
+        quantity: Number(data.quantity) || 0,
+        usage: data.usage || "",
+        expiryDate: data.expiryDate || "",
+        pharmacy: data.pharmacy || "",
+        price: Number(data.price) || 0,
+      });
+    });
+
+    return medicines;
+  } catch (error) {
+    console.error("Error getting all medicines:", error);
+    return [];
+  }
+};
+
+/**
+ * Update a medicine
+ * @param id - Medicine ID
+ * @param medicineData - Updated medicine data
+ * @returns True if successful
+ */
+export const updateMedicine = async (
+  id: string,
+  medicineData: Partial<Medicine>
+): Promise<boolean> => {
+  try {
+    const medicineRef = doc(db, COLLECTIONS.MEDICINES, id);
+
+    // Add updated timestamp
+    const dataWithTimestamp = {
+      ...medicineData,
+      updatedAt: serverTimestamp(),
+    };
+
+    await updateDoc(medicineRef, dataWithTimestamp);
+    return true;
+  } catch (error) {
+    console.error("Error updating medicine:", error);
+    return false;
+  }
+};
+
+/**
+ * Delete a medicine
+ * @param id - Medicine ID
+ * @returns True if successful
+ */
+export const deleteMedicine = async (id: string): Promise<boolean> => {
+  try {
+    await deleteDoc(doc(db, COLLECTIONS.MEDICINES, id));
+    return true;
+  } catch (error) {
+    console.error("Error deleting medicine:", error);
+    return false;
+  }
+};
+
+/**
+ * Get a medicine by ID
+ * @param id - Medicine ID
+ * @returns Medicine object or null if not found
+ */
+export const getMedicineById = async (id: string): Promise<Medicine | null> => {
+  try {
+    const docRef = doc(db, COLLECTIONS.MEDICINES, id);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      return {
+        id: docSnap.id,
+        name: data.name,
+        unit: data.unit,
+        quantity: Number(data.quantity) || 0,
+        usage: data.usage || "",
+        expiryDate: data.expiryDate || "",
+        pharmacy: data.pharmacy || "",
+        price: Number(data.price) || 0,
+      };
+    } else {
+      return null;
+    }
+  } catch (error) {
+    console.error("Error getting medicine:", error);
+    return null;
+  }
+};
+
 export default {
   // Patient functions
   addPatient,
@@ -571,6 +709,13 @@ export default {
   getInvoicesByPatient,
   updateInvoicePayment,
   getAllInvoices,
+
+  // Medicine functions
+  addMedicine,
+  getAllMedicines,
+  updateMedicine,
+  deleteMedicine,
+  getMedicineById,
 
   // New function
   getAllPatients,

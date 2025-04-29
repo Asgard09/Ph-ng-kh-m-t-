@@ -11,13 +11,13 @@ export const medicalConfig = {
 
   // Common diagnoses for quick selection
   commonDiagnoses: [
-    "Viêm họng",
-    "Cảm cúm",
-    "Đau dạ dày",
-    "Viêm xoang",
-    "Viêm phế quản",
-    "Đau đầu",
-    "Tiêu chảy",
+    "Viêm khớp dạng thấp",
+    "Gai cột sống",
+    "Thoát vị đĩa đệm",
+    "Gãy xương",
+    "Viêm khớp vảy nến",
+    "Gout",
+    "Viêm bao gân",
   ],
 
   // Common medicines
