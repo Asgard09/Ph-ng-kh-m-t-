@@ -1,0 +1,25 @@
+@import "tailwindcss";
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply text-gray-900;
+  }
+}
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-rgb: 255, 255, 255;
+}
+
+@theme inline {
+  --color-foreground: #171717;
+  --color-background: #ffffff;
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background-color: rgb(var(--background-rgb));
+}
