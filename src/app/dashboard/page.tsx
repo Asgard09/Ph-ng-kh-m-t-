@@ -195,6 +195,15 @@ export default function Dashboard() {
               </p>
             </div>
           </Link>
+
+          <Link href="/medical/regulations" className="block">
+            <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow">
+              <h3 className="text-lg font-semibold mb-2">Quy định</h3>
+              <p className="text-gray-600">
+                Thay đổi quy định về số lượng bệnh nhân và tiền khám
+              </p>
+            </div>
+          </Link>
         </div>
       </div>
     </DashboardLayout>
