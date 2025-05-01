@@ -12,6 +12,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { medicalConfig } from "@/config";
 import * as firebaseService from "@/services/firebaseService";
 import type { Patient, Examination } from "@/services/firebaseService";
+import { useRegulationValue } from "@/hooks/useRegulationValue";
 
 // Sample price mapping - this would come from your database in a real app
 const commonMedicinePrices: Record<string, number> = {
@@ -42,6 +43,9 @@ interface Invoice {
 }
 
 export default function InvoicePage() {
+  // Get consultation fee from regulations using our custom hook
+  const consultationFee = useRegulationValue("consultationFee");
+
   // State for patients with examinations
   const [patientsWithExams, setPatientsWithExams] = useState<Patient[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -73,10 +77,18 @@ export default function InvoicePage() {
     patientId: "",
     patientName: "",
     examDate: new Date().toISOString().slice(0, 10),
-    consultationFee: medicalConfig.defaultConsultationFee, // Using default fee from config
+    consultationFee: consultationFee, // Use the value from our custom hook
     medicineFee: 0,
     otherFees: 0,
   });
+
+  // Update form when regulation value changes
+  useEffect(() => {
+    setInvoiceForm((prev) => ({
+      ...prev,
+      consultationFee,
+    }));
+  }, [consultationFee]);
 
   // Load patients with examinations on component mount
   useEffect(() => {
@@ -166,57 +178,6 @@ export default function InvoicePage() {
       setLoadingInvoices(false);
     }
   };
-
-  // Get all invoices from Firebase
-  /*
-  const getAllInvoices = async (): Promise<Invoice[]> => {
-    try {
-      console.log("Fetching all invoices from Firebase...");
-
-      // Create a collection reference
-      const invoicesColRef = collection(db, "invoices");
-
-      // Get all documents
-      const querySnapshot = await getDocs(invoicesColRef);
-
-      const loadedInvoices: Invoice[] = [];
-
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        console.log(`Processing invoice ${doc.id}:`, data);
-
-        // Create invoice object
-        const invoice: Invoice = {
-          id: doc.id,
-          patientId: data.patientId || "",
-          patientName: data.patientName || "",
-          examDate: data.examDate || new Date().toISOString().slice(0, 10),
-          consultationFee: Number(data.consultationFee) || 0,
-          medicineFee: Number(data.medicineFee) || 0,
-          otherFees: Number(data.otherFees) || 0,
-          totalAmount: Number(data.totalAmount) || 0,
-          isPaid: Boolean(data.isPaid) || false,
-          paymentDate: data.paymentDate,
-          paymentMethod: data.paymentMethod,
-        };
-
-        loadedInvoices.push(invoice);
-      });
-
-      // Sort invoices by date, most recent first
-      loadedInvoices.sort(
-        (a, b) =>
-          new Date(b.examDate).getTime() - new Date(a.examDate).getTime()
-      );
-
-      console.log(`Successfully processed ${loadedInvoices.length} invoices`);
-      return loadedInvoices;
-    } catch (error) {
-      console.error("Error getting all invoices:", error);
-      return [];
-    }
-  };
-  */
 
   // Handle search for patients
   const handleSearch = () => {
@@ -562,7 +523,6 @@ export default function InvoicePage() {
         otherFees: invoiceForm.otherFees,
         totalAmount: totalAmount,
         isPaid: false,
-        createdAt: new Date().toISOString(),
       };
 
       console.log("Invoice data to save:", invoiceData);
@@ -582,12 +542,30 @@ export default function InvoicePage() {
           console.log("Added invoice to local state:", savedInvoice);
           setInvoices([savedInvoice, ...invoices]);
 
+          // Xóa bệnh nhân khỏi danh sách chờ khám
+          if (selectedPatient?.id) {
+            try {
+              const currentDate = new Date().toISOString().slice(0, 10);
+              await firebaseService.removePatientFromWaitingList(
+                selectedPatient.id,
+                currentDate
+              );
+              console.log("Đã xóa bệnh nhân khỏi danh sách chờ khám");
+            } catch (removeError) {
+              console.error(
+                "Lỗi khi xóa bệnh nhân khỏi danh sách chờ khám:",
+                removeError
+              );
+              // Không hiển thị lỗi cho người dùng vì hóa đơn đã được lưu thành công
+            }
+          }
+
           // Reset form
           setInvoiceForm({
             patientId: "",
             patientName: "",
             examDate: new Date().toISOString().slice(0, 10),
-            consultationFee: medicalConfig.defaultConsultationFee,
+            consultationFee: consultationFee,
             medicineFee: 0,
             otherFees: 0,
           });

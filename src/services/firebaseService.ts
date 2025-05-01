@@ -12,6 +12,8 @@ import {
   orderBy,
   serverTimestamp,
   Timestamp,
+  Firestore,
+  DocumentData,
 } from "firebase/firestore";
 
 // Collection references
@@ -20,10 +22,16 @@ const COLLECTIONS = {
   EXAMINATIONS: "examinations",
   INVOICES: "invoices",
   MEDICINES: "medicines",
-};
+} as const;
+
+// Base interface for timestamps
+interface TimestampFields {
+  createdAt: Timestamp | null;
+  updatedAt: Timestamp | null;
+}
 
 // Patient interface
-export interface Patient {
+export interface Patient extends Partial<TimestampFields> {
   id?: string;
   name: string;
   gender: string;
@@ -32,12 +40,10 @@ export interface Patient {
   phoneNumber: string;
   registrationTime?: string;
   registrationDate?: string;
-  createdAt?: any;
-  updatedAt?: any;
 }
 
 // Examination interface
-export interface Examination {
+export interface Examination extends Partial<TimestampFields> {
   id?: string;
   patientId: string;
   patientName: string;
@@ -45,12 +51,10 @@ export interface Examination {
   symptoms: string;
   diagnosis: string;
   medicines: Medicine[];
-  createdAt?: any;
-  updatedAt?: any;
 }
 
 // Medicine interface
-export interface Medicine {
+export interface Medicine extends Partial<TimestampFields> {
   id?: string;
   name: string;
   unit: string;
@@ -59,12 +63,10 @@ export interface Medicine {
   expiryDate?: string;
   pharmacy?: string;
   price?: number;
-  createdAt?: any;
-  updatedAt?: any;
 }
 
 // Invoice interface
-export interface Invoice {
+export interface Invoice extends Partial<TimestampFields> {
   id?: string;
   patientId: string;
   patientName: string;
@@ -76,8 +78,6 @@ export interface Invoice {
   isPaid: boolean;
   paymentDate?: string;
   paymentMethod?: string;
-  createdAt?: any;
-  updatedAt?: any;
 }
 
 /**
@@ -528,6 +528,55 @@ export const getAllInvoices = async (): Promise<Invoice[]> => {
 };
 
 /**
+ * Remove patient from waiting list after invoice creation
+ * @param patientId - Patient ID
+ * @param registrationDate - Registration date
+ * @returns True if successful
+ */
+export const removePatientFromWaitingList = async (
+  patientId: string,
+  registrationDate: string
+): Promise<boolean> => {
+  try {
+    console.log(
+      `Removing patient ${patientId} from waiting list for date ${registrationDate}`
+    );
+
+    // Không thể truy vấn trực tiếp theo ID document, nên sẽ lấy theo ngày rồi lọc
+    const patientsQuery = query(
+      collection(db, COLLECTIONS.PATIENTS),
+      where("registrationDate", "==", registrationDate)
+    );
+
+    const querySnapshot = await getDocs(patientsQuery);
+
+    if (querySnapshot.empty) {
+      console.log(
+        "Không tìm thấy bệnh nhân nào trong danh sách chờ khám cho ngày này"
+      );
+      return false;
+    }
+
+    let patientFound = false;
+
+    // Tìm document có ID khớp với patientId
+    querySnapshot.forEach((doc) => {
+      if (doc.id === patientId) {
+        // Tìm thấy bệnh nhân, xóa document
+        deleteDoc(doc.ref);
+        patientFound = true;
+        console.log(`Đã xóa bệnh nhân ${patientId} khỏi danh sách chờ khám`);
+      }
+    });
+
+    return patientFound;
+  } catch (error) {
+    console.error("Lỗi khi xóa bệnh nhân khỏi danh sách chờ khám:", error);
+    return false;
+  }
+};
+
+/**
  * Get all patients
  * @returns Array of patients
  */
@@ -709,6 +758,7 @@ export default {
   getInvoicesByPatient,
   updateInvoicePayment,
   getAllInvoices,
+  removePatientFromWaitingList,
 
   // Medicine functions
   addMedicine,

@@ -8,6 +8,7 @@ import {
   FaChartBar,
   FaHome,
   FaSignOutAlt,
+  FaCog,
 } from "react-icons/fa";
 
 const Sidebar = () => {
@@ -52,6 +53,11 @@ const Sidebar = () => {
       name: "Lập báo cáo tháng",
       path: "/medical/reports",
       icon: <FaChartBar className="w-5 h-5" />,
+    },
+    {
+      name: "Quy định",
+      path: "/medical/regulations",
+      icon: <FaCog className="w-5 h-5" />,
     },
   ];
 

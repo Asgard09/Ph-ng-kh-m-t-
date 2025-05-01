@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, Firestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { firebaseConfig } from "@/config";
 
@@ -24,7 +24,7 @@ if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
 // Khởi tạo Firebase
 let app;
 let auth;
-let db;
+let db: Firestore;
 let storage;
 
 try {

@@ -160,25 +160,28 @@ export default function ReportsPage() {
     examinations.forEach((exam) => {
       if (exam.medicines && Array.isArray(exam.medicines)) {
         exam.medicines.forEach((medicine) => {
+          if (!medicine || !medicine.id) return; // Skip if medicine or id is missing
+
           const medicineId = medicine.id;
           const current = medicineMap.get(medicineId) || {
-            name: medicine.name,
-            unit: medicine.unit,
+            name: medicine.name || "Không tên",
+            unit: medicine.unit || "Không đơn vị",
             quantity: 0,
             usageCount: 0,
           };
 
           medicineMap.set(medicineId, {
-            name: medicine.name,
-            unit: medicine.unit,
-            quantity: current.quantity + (medicine.quantity || 1),
+            ...current,
+            name: medicine.name || current.name,
+            unit: medicine.unit || current.unit,
+            quantity: current.quantity + (Number(medicine.quantity) || 0),
             usageCount: current.usageCount + 1,
           });
         });
       }
     });
 
-    // Convert map to array
+    // Convert map to array and filter out invalid entries
     const medicineData: MedicineUsage[] = Array.from(medicineMap.entries())
       .map(([id, data]) => ({
         id,
@@ -187,6 +190,7 @@ export default function ReportsPage() {
         quantity: data.quantity,
         usageCount: data.usageCount,
       }))
+      .filter((medicine) => medicine.name && medicine.unit) // Filter out entries without name or unit
       .sort((a, b) => b.quantity - a.quantity); // Sort by quantity (descending)
 
     setMedicineUsage(medicineData);

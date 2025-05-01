@@ -16,9 +16,13 @@ import { formatDate, getCurrentDate } from "@/utils/helpers";
 import * as firebaseService from "@/services/firebaseService";
 import type { Patient } from "@/services/firebaseService";
 import { useRouter } from "next/navigation";
+import { useRegulationValue } from "@/hooks/useRegulationValue";
 
 export default function ExaminationListPage() {
   const router = useRouter();
+
+  // Lấy số lượng bệnh nhân tối đa từ quy định
+  const maxPatientsPerDay = useRegulationValue("maxPatientsPerDay");
 
   // States
   const [patientList, setPatientList] = useState<Patient[]>([]);
@@ -95,6 +99,14 @@ export default function ExaminationListPage() {
 
   // Handle adding a patient
   const handleAddPatient = async () => {
+    // Kiểm tra giới hạn số lượng bệnh nhân
+    if (patientList.length >= maxPatientsPerDay) {
+      alert(
+        `Không thể thêm bệnh nhân. Đã đạt giới hạn số lượng tối đa (${maxPatientsPerDay}) trong ngày.`
+      );
+      return;
+    }
+
     const errors = validatePatientData(patientForm);
 
     if (errors.length > 0) {
@@ -268,7 +280,19 @@ export default function ExaminationListPage() {
         )}
 
         <div className="bg-white p-6 rounded-lg shadow mb-6">
-          <h2 className="text-lg font-semibold mb-4">Thêm bệnh nhân mới</h2>
+          <h2 className="text-lg font-semibold mb-4">
+            Thêm bệnh nhân mới
+            <span className="text-sm font-normal ml-2 text-gray-600">
+              (Giới hạn: {patientList.length}/{maxPatientsPerDay} bệnh nhân)
+            </span>
+          </h2>
+          {patientList.length >= maxPatientsPerDay ? (
+            <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
+              Đã đạt giới hạn số lượng bệnh nhân tối đa trong ngày (
+              {maxPatientsPerDay}).
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
