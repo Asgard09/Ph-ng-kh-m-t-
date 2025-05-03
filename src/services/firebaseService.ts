@@ -40,6 +40,7 @@ export interface Patient extends Partial<TimestampFields> {
   phoneNumber: string;
   registrationTime?: string;
   registrationDate?: string;
+  status?: string; // 'waiting' (default) or 'processed'
 }
 
 // Examination interface
@@ -132,25 +133,70 @@ export const addPatient = async (
 };
 
 /**
- * Get all patients for a specific date
- * @param date - Date string in format YYYY-MM-DD
+ * Get patients by registration date
+ * @param date - Registration date
  * @returns Array of patients
  */
 export const getPatientsByDate = async (date: string): Promise<Patient[]> => {
   try {
-    console.log("getPatientsByDate called with date:", date);
+    console.log("Getting patients for date:", date);
 
-    // Query patients for the specific date
+    // Query patients by registration date
     const q = query(
       collection(db, COLLECTIONS.PATIENTS),
       where("registrationDate", "==", date)
     );
 
-    console.log("Executing Firestore query for date:", date);
     const querySnapshot = await getDocs(q);
-    console.log("Query executed, found patients:", querySnapshot.size);
+    console.log("Query snapshot size:", querySnapshot.size);
 
-    // Map results to Patient objects
+    const patients: Patient[] = [];
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      // Chỉ hiển thị bệnh nhân đang chờ khám (status là 'waiting' hoặc không có status)
+      const patientStatus = data.status || "waiting";
+      if (patientStatus === "waiting") {
+        patients.push({
+          id: doc.id,
+          name: data.name,
+          gender: data.gender,
+          dateOfBirth: data.dateOfBirth,
+          address: data.address || "",
+          phoneNumber: data.phoneNumber,
+          registrationTime: data.registrationTime,
+          registrationDate: data.registrationDate,
+          status: patientStatus,
+        });
+      }
+    });
+
+    return patients;
+  } catch (error) {
+    console.error("Error getting patients by date:", error);
+    return [];
+  }
+};
+
+/**
+ * Get all patients for a specific date regardless of status
+ * @param date - Registration date
+ * @returns Array of patients
+ */
+export const getAllPatientsByDate = async (
+  date: string
+): Promise<Patient[]> => {
+  try {
+    console.log("Getting all patients for date:", date);
+
+    // Query patients by registration date
+    const q = query(
+      collection(db, COLLECTIONS.PATIENTS),
+      where("registrationDate", "==", date)
+    );
+
+    const querySnapshot = await getDocs(q);
+    console.log("Query snapshot size:", querySnapshot.size);
+
     const patients: Patient[] = [];
     querySnapshot.forEach((doc) => {
       const data = doc.data();
@@ -163,13 +209,13 @@ export const getPatientsByDate = async (date: string): Promise<Patient[]> => {
         phoneNumber: data.phoneNumber,
         registrationTime: data.registrationTime,
         registrationDate: data.registrationDate,
+        status: data.status || "waiting",
       });
     });
 
-    console.log("Patients for date", date, ":", patients.length);
     return patients;
   } catch (error) {
-    console.error("Error getting patients:", error);
+    console.error("Error getting all patients by date:", error);
     return [];
   }
 };
@@ -285,6 +331,48 @@ export const searchPatients = async (
   } catch (error) {
     console.error("Error searching patients:", error);
     return [];
+  }
+};
+
+/**
+ * Update a patient's status (e.g., to mark them as processed after invoicing)
+ * @param patientId - Patient ID
+ * @param registrationDate - Registration date
+ * @param status - New status ('waiting' or 'processed')
+ * @returns True if successful
+ */
+export const updatePatientStatus = async (
+  patientId: string,
+  registrationDate: string,
+  status: string
+): Promise<boolean> => {
+  try {
+    console.log(
+      `Updating patient ${patientId} status to ${status} for date ${registrationDate}`
+    );
+
+    // Truy cập trực tiếp document theo ID
+    const patientRef = doc(db, COLLECTIONS.PATIENTS, patientId);
+    const patientSnap = await getDoc(patientRef);
+
+    if (!patientSnap.exists()) {
+      console.log(`Không tìm thấy bệnh nhân với ID ${patientId}`);
+      return false;
+    }
+
+    // Cập nhật trạng thái
+    await updateDoc(patientRef, {
+      status: status,
+      updatedAt: serverTimestamp(),
+    });
+
+    console.log(
+      `Đã cập nhật trạng thái bệnh nhân ${patientId} thành ${status}`
+    );
+    return true;
+  } catch (error) {
+    console.error(`Lỗi khi cập nhật trạng thái bệnh nhân:`, error);
+    return false;
   }
 };
 
@@ -743,10 +831,12 @@ export default {
   // Patient functions
   addPatient,
   getPatientsByDate,
+  getAllPatientsByDate,
   getPatientById,
   updatePatient,
   deletePatient,
   searchPatients,
+  updatePatientStatus,
 
   // Examination functions
   addExamination,

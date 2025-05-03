@@ -26,6 +26,7 @@ export default function ExaminationListPage() {
 
   // States
   const [patientList, setPatientList] = useState<Patient[]>([]);
+  const [allPatients, setAllPatients] = useState<Patient[]>([]);
   const [currentDate, setCurrentDate] = useState<string>(getCurrentDate());
   const [loading, setLoading] = useState<boolean>(false);
   const [savingPatient, setSavingPatient] = useState<boolean>(false);
@@ -37,7 +38,12 @@ export default function ExaminationListPage() {
   const [patientForm, setPatientForm] = useState<
     Omit<
       Patient,
-      "id" | "registrationTime" | "registrationDate" | "createdAt" | "updatedAt"
+      | "id"
+      | "registrationTime"
+      | "registrationDate"
+      | "createdAt"
+      | "updatedAt"
+      | "status"
     >
   >({
     name: "",
@@ -54,6 +60,8 @@ export default function ExaminationListPage() {
       setError(null);
       try {
         console.log("Fetching patients for date:", currentDate);
+
+        // Lấy danh sách bệnh nhân đang chờ khám (status = 'waiting')
         const patients = await firebaseService.getPatientsByDate(currentDate);
         console.log("Patients retrieved:", patients);
 
@@ -64,6 +72,16 @@ export default function ExaminationListPage() {
           console.log("No patients found for date:", currentDate);
           setPatientList([]);
         }
+
+        // Lấy tất cả bệnh nhân trong ngày (cả đã khám và chưa khám)
+        const allPatientsForDay = await firebaseService.getAllPatientsByDate(
+          currentDate
+        );
+        setAllPatients(allPatientsForDay);
+        console.log(
+          "Total patients for today (including processed):",
+          allPatientsForDay.length
+        );
       } catch (err) {
         console.error("Error fetching patients:", err);
         setError("Không thể tải danh sách bệnh nhân. Vui lòng thử lại sau.");
@@ -100,7 +118,7 @@ export default function ExaminationListPage() {
   // Handle adding a patient
   const handleAddPatient = async () => {
     // Kiểm tra giới hạn số lượng bệnh nhân
-    if (patientList.length >= maxPatientsPerDay) {
+    if (allPatients.length >= maxPatientsPerDay) {
       alert(
         `Không thể thêm bệnh nhân. Đã đạt giới hạn số lượng tối đa (${maxPatientsPerDay}) trong ngày.`
       );
@@ -127,9 +145,11 @@ export default function ExaminationListPage() {
         id: patientId,
         registrationTime: now.toLocaleTimeString("vi-VN"),
         registrationDate: currentDate,
+        status: "waiting",
       };
 
       setPatientList([...patientList, newPatient]);
+      setAllPatients([...allPatients, newPatient]);
 
       // Reset form
       setPatientForm({
@@ -192,12 +212,19 @@ export default function ExaminationListPage() {
       });
 
       if (success) {
-        // Update local state
+        // Update both patientList and allPatients state
         setPatientList(
           patientList.map((p) =>
             p.id === editingPatient.id ? editingPatient : p
           )
         );
+
+        setAllPatients(
+          allPatients.map((p) =>
+            p.id === editingPatient.id ? editingPatient : p
+          )
+        );
+
         setShowEditModal(false);
         setEditingPatient(null);
         alert("Đã cập nhật thông tin bệnh nhân thành công");
@@ -226,6 +253,7 @@ export default function ExaminationListPage() {
         if (success) {
           // Update local state if deletion was successful
           setPatientList(patientList.filter((patient) => patient.id !== id));
+          setAllPatients(allPatients.filter((patient) => patient.id !== id));
           alert("Đã xóa bệnh nhân khỏi danh sách");
         } else {
           alert("Không thể xóa bệnh nhân. Vui lòng thử lại.");
@@ -283,10 +311,10 @@ export default function ExaminationListPage() {
           <h2 className="text-lg font-semibold mb-4">
             Thêm bệnh nhân mới
             <span className="text-sm font-normal ml-2 text-gray-600">
-              (Giới hạn: {patientList.length}/{maxPatientsPerDay} bệnh nhân)
+              (Giới hạn: {allPatients.length}/{maxPatientsPerDay} bệnh nhân)
             </span>
           </h2>
-          {patientList.length >= maxPatientsPerDay ? (
+          {allPatients.length >= maxPatientsPerDay ? (
             <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
               Đã đạt giới hạn số lượng bệnh nhân tối đa trong ngày (
               {maxPatientsPerDay}).

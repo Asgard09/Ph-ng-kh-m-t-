@@ -542,19 +542,23 @@ export default function InvoicePage() {
           console.log("Added invoice to local state:", savedInvoice);
           setInvoices([savedInvoice, ...invoices]);
 
-          // Xóa bệnh nhân khỏi danh sách chờ khám
+          // Thay vì xóa bệnh nhân khỏi danh sách chờ khám,
+          // chỉ cập nhật trạng thái của họ thành "đã thanh toán"
           if (selectedPatient?.id) {
             try {
               const currentDate = new Date().toISOString().slice(0, 10);
-              await firebaseService.removePatientFromWaitingList(
+              await firebaseService.updatePatientStatus(
                 selectedPatient.id,
-                currentDate
+                currentDate,
+                "processed"
               );
-              console.log("Đã xóa bệnh nhân khỏi danh sách chờ khám");
-            } catch (removeError) {
+              console.log(
+                "Đã cập nhật trạng thái bệnh nhân thành đã thanh toán"
+              );
+            } catch (updateError) {
               console.error(
-                "Lỗi khi xóa bệnh nhân khỏi danh sách chờ khám:",
-                removeError
+                "Lỗi khi cập nhật trạng thái bệnh nhân:",
+                updateError
               );
               // Không hiển thị lỗi cho người dùng vì hóa đơn đã được lưu thành công
             }
